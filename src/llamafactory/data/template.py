@@ -1982,6 +1982,17 @@ register_template(
 )
 
 
+register_template(
+    name="minicpm_v_4_7",
+    format_user=StringFormatter(slots=["<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n"]),
+    format_assistant=StringFormatter(slots=["{{content}}<|im_end|>\n"]),
+    format_system=StringFormatter(slots=["<|im_start|>system\n{{content}}<|im_end|>\n"]),
+    stop_words=["<|im_end|>"],
+    mm_plugin=get_mm_plugin(name="minicpm_v_4_7", image_token="<|image_pad|>", video_token="<|video_pad|>"),
+    template_class=ReasoningTemplate,
+)
+
+
 # copied from minicpm_v template
 register_template(
     name="minicpm_o",

@@ -2010,6 +2010,64 @@ class MiniCPMV4_6Plugin(BasePlugin):
 
 
 @dataclass
+class MiniCPMV4_7Plugin(BasePlugin):
+    def _get_mm_inputs(self, images, videos, audios, processor, **kwargs):
+        self._validate_input(processor, images, videos, audios)
+        downsample_mode = os.getenv("DOWNSAMPLE_MODE", processor.image_processor.downsample_mode)
+        if downsample_mode not in ("4x", "16x"):
+            raise ValueError("MiniCPM-V 4.7 requires DOWNSAMPLE_MODE=4x or 16x.")
+
+        mm_inputs = {"downsample_mode": downsample_mode}
+        if images or videos:
+            media_tokens = [processor.image_token] * len(images) + [processor.video_token] * len(videos)
+            mm_inputs.update(
+                processor(
+                    text=processor.tokenizer.eos_token.join(media_tokens),
+                    images=images or None,
+                    videos=videos or None,
+                    downsample_mode=downsample_mode,
+                    add_special_tokens=False,
+                    return_tensors="pt",
+                )
+            )
+        return mm_inputs
+
+    @override
+    def process_messages(self, messages, images, videos, audios, processor):
+        self._validate_input(processor, images, videos, audios)
+        self._validate_messages(messages, images, videos, audios)
+        messages = deepcopy(messages)
+        if self.expand_mm_tokens and (images or videos):
+            mm_inputs = self._get_mm_inputs(images, videos, audios, processor)
+            replacements = processor.tokenizer.decode(
+                mm_inputs["input_ids"][0], clean_up_tokenization_spaces=False
+            ).split(processor.tokenizer.eos_token)
+            image_replacements = iter(replacements[: len(images)])
+            video_replacements = iter(replacements[len(images) :])
+        else:
+            image_replacements = iter([processor.image_token] * len(images))
+            video_replacements = iter([processor.video_token] * len(videos))
+
+        for message in messages:
+            for placeholder, replacements in (
+                (IMAGE_PLACEHOLDER, image_replacements),
+                (VIDEO_PLACEHOLDER, video_replacements),
+            ):
+                message["content"] = re.sub(
+                    re.escape(placeholder), lambda _: next(replacements) + "\n", message["content"]
+                )
+        return messages
+
+    @override
+    def get_mm_inputs(self, images, videos, audios, imglens, vidlens, audlens, batch_ids, processor):
+        mm_inputs = self._get_mm_inputs(images, videos, audios, processor)
+        for key in ("input_ids", "attention_mask", "mm_token_type_ids"):
+            mm_inputs.pop(key, None)
+        mm_inputs["mm_token_type_ids"] = processor.create_mm_token_type_ids(batch_ids)
+        return mm_inputs
+
+
+@dataclass
 class MllamaPlugin(BasePlugin):
     @override
     def process_messages(
@@ -3467,6 +3525,7 @@ PLUGINS = {
     "lfm2_vl": LFMVLPlugin,
     "minicpm_v": MiniCPMVPlugin,
     "minicpm_v_4_6": MiniCPMV4_6Plugin,
+    "minicpm_v_4_7": MiniCPMV4_7Plugin,
     "mllama": MllamaPlugin,
     "moss_vl": MossVLPlugin,
     "paligemma": PaliGemmaPlugin,

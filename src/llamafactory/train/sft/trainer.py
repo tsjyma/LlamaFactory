@@ -65,7 +65,7 @@ class CustomSeq2SeqTrainer(Seq2SeqTrainer):
                 patch_accelerator_for_fp8()
 
         super().__init__(**kwargs)
-        if processor is not None:
+        if processor is not None and getattr(self.model.config, "model_type", None) != "minicpmv4_7":
             # avoid wrong loss under gradient accumulation
             # https://github.com/huggingface/transformers/pull/36044#issuecomment-2746657112
             self.model_accepts_loss_kwargs = False

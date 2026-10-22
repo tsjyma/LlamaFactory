@@ -2017,6 +2017,22 @@ register_model_group(
 
 register_model_group(
     models={
+        "MiniCPM-V-4.7-1B": {
+            DownloadSource.DEFAULT: "openbmb/MiniCPM-V-4.7-1B",
+            DownloadSource.MODELSCOPE: "OpenBMB/MiniCPM-V-4.7-1B",
+        },
+        "MiniCPM-V-4.7-35B-A3B": {
+            DownloadSource.DEFAULT: "openbmb/MiniCPM-V-4.7-35B-A3B",
+            DownloadSource.MODELSCOPE: "OpenBMB/MiniCPM-V-4.7-35B-A3B",
+        },
+    },
+    template="minicpm_v_4_7",
+    multimodal=True,
+)
+
+
+register_model_group(
+    models={
         "Ministral-8B-Instruct-2410": {
             DownloadSource.DEFAULT: "mistralai/Ministral-8B-Instruct-2410",
             DownloadSource.MODELSCOPE: "mistralai/Ministral-8B-Instruct-2410",

@@ -49,6 +49,12 @@ def add_z3_leaf_module(model: "PreTrainedModel") -> None:
     text_config = getattr(model.config, "text_config", None)
     text_model_type = getattr(text_config, "model_type", None)
 
+    if model_type == "minicpmv4_7":
+        from transformers.models.minicpmv4_7.modeling_minicpmv4_7 import MiniCPMV4_7Merger
+
+        _set_z3_leaf_modules(model, [MiniCPMV4_7Merger])
+        model.model.merger.register_forward_hook(lambda module, inputs, output: (torch.cat(output, dim=0),))
+
     if model_type == "dbrx":
         from transformers.models.dbrx.modeling_dbrx import DbrxFFN
 
@@ -151,7 +157,9 @@ def add_z3_leaf_module(model: "PreTrainedModel") -> None:
 
         _set_z3_leaf_modules(model, [Qwen3NextSparseMoeBlock])
 
-    if model_type in ("qwen3_5_moe", "qwen3_5_moe_text"):
+    if model_type in ("qwen3_5_moe", "qwen3_5_moe_text") or (
+        model_type == "minicpmv4_7" and text_model_type == "qwen3_5_moe_text"
+    ):
         from transformers.models.qwen3_5_moe.modeling_qwen3_5_moe import Qwen3_5MoeSparseMoeBlock
 
         _set_z3_leaf_modules(model, [Qwen3_5MoeSparseMoeBlock])

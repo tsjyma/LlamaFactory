@@ -670,6 +670,8 @@ def get_train_args(args: dict[str, Any] | list[str] | None = None) -> _TRAIN_CLS
         model_args.compute_dtype = torch.float16
 
     data_args.packing = data_args.packing if data_args.packing is not None else finetuning_args.stage == "pt"
+    if data_args.template == "minicpm_v_4_7" and data_args.packing:
+        raise ValueError("MiniCPM-V 4.7 does not support packing yet.")
     model_args.device_map = {"": get_current_device()}
     model_args.model_max_length = data_args.cutoff_len
     model_args.block_diag_attn = data_args.neat_packing

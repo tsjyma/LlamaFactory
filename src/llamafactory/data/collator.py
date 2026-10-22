@@ -28,6 +28,7 @@ from transformers import DataCollatorForSeq2Seq
 
 from ..extras.constants import AUDIO_PLACEHOLDER, IGNORE_INDEX, IMAGE_PLACEHOLDER, MROPE_MODELS
 from ..extras.packages import is_pillow_available
+from .mm_plugin import MiniCPMV4_7Plugin
 
 
 if is_pillow_available():
@@ -150,8 +151,8 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
         if isinstance(self.model, PeftModel):
             self.model = self.model.base_model.model
 
-        if getattr(getattr(self.model, "config", None), "model_type", None) == "moss_vl":
-            self.get_rope_func = None  # MOSS-VL computes its own XRoPE positions in model.forward.
+        if getattr(getattr(self.model, "config", None), "model_type", None) in ("moss_vl", "minicpmv4_7"):
+            self.get_rope_func = None  # These models compute their own multimodal positions in model.forward.
         elif self.model is not None and hasattr(self.model, "get_rope_index"):  # for qwen2vl mrope
             self.get_rope_func = self.model.get_rope_index  # transformers < 4.52.0 or qwen2.5 omni
         elif self.model is not None and hasattr(self.model, "model") and hasattr(self.model.model, "get_rope_index"):
@@ -433,6 +434,14 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
         features: dict[str, torch.Tensor] = super().__call__(features)
 
         bsz, seq_len = features["input_ids"].shape[:2]
+        if isinstance(self.template.mm_plugin, MiniCPMV4_7Plugin):
+            if any(p is not None for p in packing_params_list):
+                raise ValueError("MiniCPM-V 4.7 does not support packing yet.")
+            token_types = mm_inputs["mm_token_type_ids"]
+            pad_len = seq_len - token_types.shape[-1]
+            padding = (0, pad_len) if self.tokenizer.padding_side == "right" else (pad_len, 0)
+            mm_inputs["mm_token_type_ids"] = F.pad(token_types, padding, value=0)
+            features.pop("position_ids", None)
         is_omni = model_type in [
             "qwen2_5_omni_thinker",
             "qwen3_omni_moe_thinker",
