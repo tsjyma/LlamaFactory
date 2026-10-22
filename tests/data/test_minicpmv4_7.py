@@ -130,3 +130,22 @@ def test_registered_models_and_freezing():
     assert "MiniCPM-V-4.7-35B-A3B" in SUPPORTED_MODELS
     args = FinetuningArguments(freeze_vision_tower=False, freeze_multi_modal_projector=True)
     assert get_forbidden_modules(SimpleNamespace(model_type="minicpmv4_7"), args) == {"model.merger"}
+
+
+@pytest.mark.parametrize("text_type", ["qwen3_5_text", "qwen3_5_moe_text"])
+def test_zero3_merger_and_expert_leaves(monkeypatch, text_type):
+    modeling = pytest.importorskip("transformers.models.minicpmv4_7.modeling_minicpmv4_7")
+    from llamafactory.model.model_utils import moe
+
+    monkeypatch.setattr(moe, "is_deepspeed_zero3_enabled", lambda: True)
+    register = Mock()
+    monkeypatch.setattr(moe, "_set_z3_leaf_modules", register)
+    model = SimpleNamespace(
+        config=SimpleNamespace(model_type="minicpmv4_7", text_config=SimpleNamespace(model_type=text_type)),
+        model=SimpleNamespace(merger=torch.nn.Identity()),
+    )
+    moe.add_z3_leaf_module(model)
+    assert register.call_args_list[0].args == (model, [modeling.MiniCPMV4_7Merger])
+    assert register.call_count == (2 if text_type == "qwen3_5_moe_text" else 1)
+    output = model.model.merger([torch.ones(2, 3), torch.zeros(1, 3)])
+    assert len(output) == 1 and output[0].shape == (3, 3)
